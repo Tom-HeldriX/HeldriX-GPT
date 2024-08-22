@@ -1,4 +1,7 @@
-name: Build and Deploy OpenAssistantGPT to Azure Web App
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy Node.js app to Azure Web App - heldrixgpt
 
 on:
   push:
@@ -6,53 +9,63 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  AZURE_WEBAPP_NAME: your-app-name # Set this to your application's name
-  AZURE_WEBAPP_PACKAGE_PATH: '.' # Set this to the path to your web app project, defaults to the repository root
-  NODE_VERSION: '16.x' # Set this to the node version to use
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
 
-    - name: Install dependencies, build, and test
-      run: |
-        npm install
-        npm run build --if-present
-        npm run test --if-present
+      - name: npm install, build, and test
+        run: |
+          npm install --legacy-peer-deps
+          npm audit fix --force
+          npm install shikiji
+          npm run build --if-present
+          npm run test --if-present
+      - name: Zip artifact for deployment
+        run: zip release.zip ./* -r
 
-    - name: Upload artifact for deployment job
-      uses: actions/upload-artifact@v4
-      with:
-        name: node-app
-        path: .
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-app
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
     environment:
-      name: 'production'
+      name: 'Production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    permissions:
+      id-token: write #This is required for requesting the JWT
 
     steps:
-    - name: Download artifact from build job
-      uses: actions/download-artifact@v4
-      with:
-        name: node-app
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: node-app
 
-    - name: 'Deploy to Azure WebApp'
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+      - name: Unzip artifact for deployment
+        run: unzip release.zip
+      
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_D4CDC1F28C4F408CB59CD7F3BA11538D }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1D362B7341304BEE9165F94A0FE69561 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D8C6ED3CF450479FA1EE3AEAFC848987 }}
+
+      - name: 'Deploy to Azure Web App'
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'heldrixgpt'
+          slot-name: 'Production'
+          package: .
