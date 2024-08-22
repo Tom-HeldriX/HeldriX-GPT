@@ -26,6 +26,9 @@ jobs:
           npm install --legacy-peer-deps
           npm audit fix --force
           npm install shikiji
+          npm install postcss@latest
+          npm outdated
+          npm update
           npm run build --if-present
           npm run test --if-present
       - name: Zip artifact for deployment
